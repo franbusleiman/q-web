@@ -1,4 +1,4 @@
-package com.busleiman.qwallet.config;
+package com.busleiman.qweb.config;
 
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
