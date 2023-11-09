@@ -94,7 +94,7 @@ public class MessageReceiver {
                         sender.declareQueue(QueueSpecification.queue(queueC))
                                 .then(sender.bind(new BindingSpecification()
                                         .exchange(topicExchange)
-                                        .queue(queueB)
+                                        .queue(queueC)
                                         .routingKey(routingKey))
                                 ))
 
