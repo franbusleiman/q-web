@@ -36,11 +36,12 @@ public class MessageReceiver {
     }
 
     @PostConstruct
-    private void init() {
+    private void init() throws InterruptedException {
         send();
         consume();
         consume2();
     }
+
 
     @PreDestroy
     public void close() throws Exception {
@@ -50,10 +51,6 @@ public class MessageReceiver {
     public Disposable send(){
         String topicExchange = "topic-exchange";
         String routingKey = "topic.key";
-
-        String queueB = "queue-B";
-        String queueC = "queue-C";
-
 
         String message = "{\n" +
                 "  \"id\": 1,\n" +
@@ -69,79 +66,9 @@ public class MessageReceiver {
          * una sera consumida por el banco, que validara y descontara el saldo del usuario,
          * y la otra por la wallet, que valida la existencia del usuario, y si no lo crea.
          */
-      return  sender.declareExchange(ExchangeSpecification.exchange(topicExchange).type("topic"))
-                .then(
-                        sender.declareExchange(ExchangeSpecification.exchange("queue-A").type("direct")))
-
-                .then(
-                        sender.declareExchange(ExchangeSpecification.exchange("queue-D").type("direct")))
-
-                .then(
-                        sender.declareExchange(ExchangeSpecification.exchange("queue-E").type("direct")))
-                .then(
-                        sender.declareExchange(ExchangeSpecification.exchange("queue-X").type("direct")))
-                .then(
-                        sender.declareExchange(ExchangeSpecification.exchange("queue-F").type("direct")))
-
-
-                .then(sender.declareQueue(QueueSpecification.queue(queueB))
-                        .then(sender.bind(new BindingSpecification()
-                                .exchange(topicExchange)
-                                .queue(queueB)
-                                .routingKey(routingKey))
-                        ))
-                .then(
-                        sender.declareQueue(QueueSpecification.queue(queueC))
-                                .then(sender.bind(new BindingSpecification()
-                                        .exchange(topicExchange)
-                                        .queue(queueC)
-                                        .routingKey(routingKey))
-                                ))
-
-                .then(
-                        sender.declareQueue(QueueSpecification.queue("queue-A"))
-                                .then(sender.bind(new BindingSpecification()
-                                        .exchange("queue-A")
-                                        .queue("queue-A")
-                                        .routingKey(routingKey))
-                                )
-
-                )
-                .then(
-                        sender.declareQueue(QueueSpecification.queue("queue-D"))
-                                .then(sender.bind(new BindingSpecification()
-                                        .exchange("queue-D")
-                                        .queue("queue-D")
-                                        .routingKey(routingKey))
-                                )
-                )
-                .then(
-                        sender.declareQueue(QueueSpecification.queue("queue-E"))
-                                .then(sender.bind(new BindingSpecification()
-                                        .exchange("queue-E")
-                                        .queue("queue-E")
-                                        .routingKey(routingKey))
-                                )
-                )
-                .then(
-                        sender.declareQueue(QueueSpecification.queue("queue-X"))
-                                .then(sender.bind(new BindingSpecification()
-                                        .exchange("queue-X")
-                                        .queue("queue-X")
-                                        .routingKey(routingKey))
-                                )
-                )
-                .then(
-                        sender.declareQueue(QueueSpecification.queue("queue-F"))
-                                .then(sender.bind(new BindingSpecification()
-                                        .exchange("queue-F")
-                                        .queue("queue-F")
-                                        .routingKey(routingKey))
-                                )
-                )
-                .then(sender.send(Mono.just(new OutboundMessage(
+      return  sender.send(Mono.just(new OutboundMessage(
                         topicExchange, routingKey, message.getBytes()
-                ))))
+                )))
                 .subscribe();
     }
 
@@ -181,8 +108,7 @@ public class MessageReceiver {
             walletConfirmation.setSellerDni("46171291");
             walletConfirmation.setOrderState("ACCEPTED");
             return Mono.just(walletConfirmation);
-        }).map(walletConfirmation -> sender.declareQueue(QueueSpecification.queue(queueA))
-                    .thenMany(sender.sendWithPublishConfirms(outboundMessage(walletConfirmation, queueA)))
+        }).map(walletConfirmation -> sender.sendWithPublishConfirms(outboundMessage(walletConfirmation, queueA))
                     .subscribe()
         ).subscribe();
     }
