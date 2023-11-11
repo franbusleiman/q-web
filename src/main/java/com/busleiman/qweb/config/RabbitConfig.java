@@ -15,6 +15,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.rabbitmq.*;
 
+import static com.busleiman.qweb.utils.Constants.*;
+
 @Configuration
 public class RabbitConfig {
 
@@ -58,57 +60,50 @@ public class RabbitConfig {
 
     @PostConstruct
     public void init() {
-        String topicExchange = "topic-exchange";
-        String routingKey = "topic.key";
 
         // Declare exchanges
-        Exchange topicExchangeDeclaration = ExchangeBuilder.fanoutExchange(topicExchange).build();
-        amqpAdmin.declareExchange(topicExchangeDeclaration);
+        Exchange fanoutExchangeDeclaration = ExchangeBuilder.fanoutExchange(FANOUT_EXCHANGE).build();
+        amqpAdmin.declareExchange(fanoutExchangeDeclaration);
 
-        Exchange directExchangeA = ExchangeBuilder.directExchange("queue-A").build();
-        Exchange directExchangeD = ExchangeBuilder.directExchange("queue-D").build();
-        Exchange directExchangeE = ExchangeBuilder.directExchange("queue-E").build();
-        Exchange directExchangeX = ExchangeBuilder.directExchange("queue-X").build();
-        Exchange directExchangeF = ExchangeBuilder.directExchange("queue-F").build();
+        Exchange queuesExchange = ExchangeBuilder.directExchange(QUEUES_EXCHANGE).build();
 
-        amqpAdmin.declareExchange(directExchangeA);
-        amqpAdmin.declareExchange(directExchangeD);
-        amqpAdmin.declareExchange(directExchangeE);
-        amqpAdmin.declareExchange(directExchangeX);
-        amqpAdmin.declareExchange(directExchangeF);
+        amqpAdmin.declareExchange(queuesExchange);
 
         // Declare queues
-        Queue queueB = new Queue("queue-B");
-        Queue queueC = new Queue("queue-C");
-        Queue queueA = new Queue("queue-A");
-        Queue queueD = new Queue("queue-D");
-        Queue queueE = new Queue("queue-E");
-        Queue queueX = new Queue("queue-X");
-        Queue queueF = new Queue("queue-F");
+        Queue queueA = new Queue(QUEUE_A);
+        Queue queueB = new Queue(QUEUE_B);
+        Queue queueC = new Queue(QUEUE_C);
+        Queue queueD = new Queue(QUEUE_D);
+        Queue queueE = new Queue(QUEUE_E);
+        Queue queueF = new Queue(QUEUE_F);
+        Queue queueG = new Queue(QUEUE_G);
+
 
         amqpAdmin.declareQueue(queueB);
         amqpAdmin.declareQueue(queueC);
         amqpAdmin.declareQueue(queueA);
         amqpAdmin.declareQueue(queueD);
         amqpAdmin.declareQueue(queueE);
-        amqpAdmin.declareQueue(queueX);
         amqpAdmin.declareQueue(queueF);
+        amqpAdmin.declareQueue(queueG);
+
 
         // Declare bindings
-        Binding bindingB = BindingBuilder.bind(queueB).to(topicExchangeDeclaration).with(routingKey).noargs();
-        Binding bindingC = BindingBuilder.bind(queueC).to(topicExchangeDeclaration).with(routingKey).noargs();
-        Binding bindingA = BindingBuilder.bind(queueA).to(directExchangeA).with(routingKey).noargs();
-        Binding bindingD = BindingBuilder.bind(queueD).to(directExchangeD).with(routingKey).noargs();
-        Binding bindingE = BindingBuilder.bind(queueE).to(directExchangeE).with(routingKey).noargs();
-        Binding bindingX = BindingBuilder.bind(queueX).to(directExchangeX).with(routingKey).noargs();
-        Binding bindingF = BindingBuilder.bind(queueF).to(directExchangeF).with(routingKey).noargs();
+        Binding bindingB = BindingBuilder.bind(queueB).to(fanoutExchangeDeclaration).with(QUEUE_B).noargs();
+        Binding bindingC = BindingBuilder.bind(queueC).to(fanoutExchangeDeclaration).with(QUEUE_C).noargs();
+        Binding bindingA = BindingBuilder.bind(queueA).to(queuesExchange).with(QUEUE_A).noargs();
+        Binding bindingD = BindingBuilder.bind(queueD).to(queuesExchange).with(QUEUE_D).noargs();
+        Binding bindingE = BindingBuilder.bind(queueE).to(queuesExchange).with(QUEUE_E).noargs();
+        Binding bindingF = BindingBuilder.bind(queueF).to(queuesExchange).with(QUEUE_F).noargs();
+        Binding bindingG = BindingBuilder.bind(queueG).to(queuesExchange).with(QUEUE_G).noargs();
+
 
         amqpAdmin.declareBinding(bindingB);
         amqpAdmin.declareBinding(bindingC);
         amqpAdmin.declareBinding(bindingA);
         amqpAdmin.declareBinding(bindingD);
         amqpAdmin.declareBinding(bindingE);
-        amqpAdmin.declareBinding(bindingX);
         amqpAdmin.declareBinding(bindingF);
+        amqpAdmin.declareBinding(bindingG);
     }
 }
