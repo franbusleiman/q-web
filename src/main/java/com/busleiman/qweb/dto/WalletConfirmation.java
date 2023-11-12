@@ -13,4 +13,6 @@ public class WalletConfirmation {
 
     //a setear una vez consumido
     private String sellerDni;
+
+    private String errorDescription;
 }

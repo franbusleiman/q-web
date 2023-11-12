@@ -53,7 +53,6 @@ public class OrderService {
         OrderRequest orderRequest = OrderRequest.builder()
                 .id(1L)
                 .buyerDni("42384769")
-                .sellerDni("46171291")
                 .javaCoinPrice(500L)
                 .usdAmount(1L)
                 .build();
@@ -92,7 +91,6 @@ public class OrderService {
 
             String json = new String(message.getBody(), StandardCharsets.UTF_8);
             WalletConfirmation walletConfirmation;
-            System.out.println(json);
 
             try {
                 walletConfirmation = objectMapper.readValue(json, WalletConfirmation.class);
