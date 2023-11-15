@@ -1,11 +1,10 @@
 package com.busleiman.qweb;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import reactor.core.publisher.Mono;
-import reactor.rabbitmq.*;
+import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 
+@EnableR2dbcRepositories
 @SpringBootApplication
 public class QWebApplication {
 

@@ -2,11 +2,14 @@ package com.busleiman.qweb.service;
 
 import com.busleiman.qweb.dto.OrderRequest;
 import com.busleiman.qweb.dto.WalletConfirmation;
+import com.busleiman.qweb.model.Order;
+import com.busleiman.qweb.repository.OrderRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Connection;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
@@ -21,15 +24,20 @@ import static com.busleiman.qweb.utils.Constants.*;
 @Service
 public class OrderService {
 
-
+    @Autowired
+    private OrderRepository orderRepository;
     @Autowired
     private Mono<Connection> connectionMono;
     private final Receiver receiver;
     private final Sender sender;
+    private final ModelMapper modelMapper;
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    public OrderService(Sender sender, Receiver receiver) {
+    public OrderService(OrderRepository orderRepository,
+                        ModelMapper modelMapper, Receiver receiver, Sender sender) {
+        this.orderRepository = orderRepository;
+        this.modelMapper = modelMapper;
         this.receiver = receiver;
         this.sender = sender;
     }
@@ -50,12 +58,14 @@ public class OrderService {
     public Disposable send(){
 
 
-        OrderRequest orderRequest = OrderRequest.builder()
+        Order order = Order.builder()
                 .id(1L)
                 .buyerDni("42384769")
+                .usdAmount(10L)
                 .javaCoinPrice(500L)
-                .usdAmount(1L)
                 .build();
+
+        OrderRequest orderRequest = modelMapper.map(orderRepository.save(order), OrderRequest.class);
 
 
         /**
@@ -98,10 +108,41 @@ public class OrderService {
                 throw new RuntimeException(e);
             }
 
-            //Un vendedor toma la orden
-            walletConfirmation.setSellerDni("46171291");
-            walletConfirmation.setOrderState("ACCEPTED");
-            return Mono.just(walletConfirmation);
+            return orderRepository.findById(walletConfirmation.getId())
+                    .flatMap(order -> {
+
+                        if(walletConfirmation.getBankAccepted()!=null){
+                            order.setBankAccepted(walletConfirmation.getBankAccepted());
+                        }
+                        else if(walletConfirmation.getWalletAccepted()!=null){
+                            order.setBankAccepted(walletConfirmation.getWalletAccepted());
+                        }
+
+                        return orderRepository.save(order)
+                                .flatMap(orderSaved ->{
+
+                                    if(order.getWalletAccepted()== null || order.getBankAccepted()==null){
+                                        return Mono.empty();
+                                    }
+                                    else if(!order.getWalletAccepted() && !order.getBankAccepted()) {
+                                        return Mono.empty();
+                                    }
+                                    else if (!order.getWalletAccepted() || !order.getBankAccepted()){
+
+                                        walletConfirmation.setOrderState("NOT_ACCEPTED");
+                                        return Mono.just(walletConfirmation);
+                                    }
+
+                                    else {
+                                        //Un vendedor toma la orden
+                                        walletConfirmation.setSellerDni("46171291");
+                                        walletConfirmation.setOrderState("ACCEPTED");
+                                        return Mono.just(walletConfirmation);
+                                    }
+                                });
+                    });
+
+
         }).map(walletConfirmation -> sender.send(outboundMessage(walletConfirmation, QUEUE_A, QUEUES_EXCHANGE))
                     .subscribe()
         ).subscribe();

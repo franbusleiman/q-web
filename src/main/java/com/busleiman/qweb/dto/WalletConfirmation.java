@@ -15,4 +15,6 @@ public class WalletConfirmation {
     private String sellerDni;
 
     private String errorDescription;
+    private Boolean bankAccepted;
+    private Boolean walletAccepted;
 }
