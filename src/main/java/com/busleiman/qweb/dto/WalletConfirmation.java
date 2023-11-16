@@ -1,5 +1,6 @@
 package com.busleiman.qweb.dto;
 
+import com.busleiman.qweb.model.OrderState;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -9,12 +10,10 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 public class WalletConfirmation {
     private Long id;
-    private String orderState;
+    private OrderState orderState;
 
     //a setear una vez consumido
     private String sellerDni;
-
     private String errorDescription;
-    private Boolean bankAccepted;
-    private Boolean walletAccepted;
 }
+

@@ -3,19 +3,23 @@ package com.busleiman.qweb.service;
 import com.busleiman.qweb.dto.OrderRequest;
 import com.busleiman.qweb.dto.WalletConfirmation;
 import com.busleiman.qweb.model.Order;
+import com.busleiman.qweb.model.OrderState;
 import com.busleiman.qweb.repository.OrderRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Connection;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.rabbitmq.*;
+import reactor.rabbitmq.OutboundMessage;
+import reactor.rabbitmq.Receiver;
+import reactor.rabbitmq.Sender;
 
 import java.nio.charset.StandardCharsets;
 
@@ -42,11 +46,12 @@ public class OrderService {
         this.sender = sender;
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     private void init() throws InterruptedException {
         send();
         consume();
         consume2();
+        consume3();
     }
 
 
@@ -55,25 +60,29 @@ public class OrderService {
         connectionMono.block().close();
     }
 
-    public Disposable send(){
+    public Disposable send() {
 
 
         Order order = Order.builder()
                 .id(1L)
                 .buyerDni("42384769")
                 .usdAmount(10L)
+                .bankAccepted(OrderState.IN_PROGRESS)
+                .walletAccepted(OrderState.IN_PROGRESS)
+                .orderState(OrderState.IN_PROGRESS)
                 .javaCoinPrice(500L)
                 .build();
-
-        OrderRequest orderRequest = modelMapper.map(orderRepository.save(order), OrderRequest.class);
-
 
         /**
          *Se envía la orden a registrar mediante una exchange fanout,
          * sera consumida por el banco, que validara y descontara el saldo del usuario,
          * y por la wallet, que valida la existencia del usuario, y si no lo crea.
          */
-      return  sender.send(outboundMessage(orderRequest, "", FANOUT_EXCHANGE))
+
+        return orderRepository.save(order)
+                .map(order1 -> modelMapper.map(order1, OrderRequest.class))
+                .map(orderRequest -> sender.send(outboundMessage(orderRequest, "", FANOUT_EXCHANGE))
+                        .subscribe())
                 .subscribe();
     }
 
@@ -111,40 +120,68 @@ public class OrderService {
             return orderRepository.findById(walletConfirmation.getId())
                     .flatMap(order -> {
 
-                        if(walletConfirmation.getBankAccepted()!=null){
-                            order.setBankAccepted(walletConfirmation.getBankAccepted());
-                        }
-                        else if(walletConfirmation.getWalletAccepted()!=null){
-                            order.setBankAccepted(walletConfirmation.getWalletAccepted());
-                        }
+                        order.setWalletAccepted(walletConfirmation.getOrderState());
 
                         return orderRepository.save(order)
-                                .flatMap(orderSaved ->{
-
-                                    if(order.getWalletAccepted()== null || order.getBankAccepted()==null){
-                                        return Mono.empty();
-                                    }
-                                    else if(!order.getWalletAccepted() && !order.getBankAccepted()) {
-                                        return Mono.empty();
-                                    }
-                                    else if (!order.getWalletAccepted() || !order.getBankAccepted()){
-
-                                        walletConfirmation.setOrderState("NOT_ACCEPTED");
+                                .flatMap(orderSaved -> {
+                                    if (order.getWalletAccepted() == OrderState.NOT_ACCEPTED || order.getBankAccepted() == OrderState.NOT_ACCEPTED) {
+                                       walletConfirmation.setSellerDni("");
                                         return Mono.just(walletConfirmation);
-                                    }
+                                    } else if (order.getWalletAccepted() == OrderState.IN_PROGRESS || order.getBankAccepted() == OrderState.IN_PROGRESS) {
+                                        return Mono.empty();
+                                    } else {
 
-                                    else {
                                         //Un vendedor toma la orden
                                         walletConfirmation.setSellerDni("46171291");
-                                        walletConfirmation.setOrderState("ACCEPTED");
+                                        walletConfirmation.setOrderState(OrderState.ACCEPTED);
                                         return Mono.just(walletConfirmation);
                                     }
                                 });
                     });
-
-
         }).map(walletConfirmation -> sender.send(outboundMessage(walletConfirmation, QUEUE_A, QUEUES_EXCHANGE))
-                    .subscribe()
+                .subscribe()
+        ).subscribe();
+    }
+
+    public Disposable consume3() {
+
+        return receiver.consumeAutoAck(QUEUE_H).flatMap(message -> {
+
+            String json = new String(message.getBody(), StandardCharsets.UTF_8);
+            WalletConfirmation walletConfirmation;
+
+            try {
+                walletConfirmation = objectMapper.readValue(json, WalletConfirmation.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+
+            return orderRepository.findById(walletConfirmation.getId())
+                    .flatMap(order -> {
+
+                        order.setBankAccepted(walletConfirmation.getOrderState());
+
+                        return orderRepository.save(order)
+                                .flatMap(orderSaved -> {
+                                    System.out.println(orderSaved);
+
+
+                                    if (order.getWalletAccepted() == OrderState.NOT_ACCEPTED || order.getBankAccepted() == OrderState.NOT_ACCEPTED) {
+                                        walletConfirmation.setSellerDni("");
+                                        walletConfirmation.setOrderState(OrderState.NOT_ACCEPTED);
+                                        return Mono.just(walletConfirmation);
+                                    } else if (order.getWalletAccepted() == OrderState.IN_PROGRESS || order.getBankAccepted() == OrderState.IN_PROGRESS) {
+                                        return Mono.empty();
+                                    } else {
+                                        //Un vendedor toma la orden
+                                        walletConfirmation.setSellerDni("46171291");
+                                        walletConfirmation.setOrderState(OrderState.ACCEPTED);
+                                        return Mono.just(walletConfirmation);
+                                    }
+                                });
+                    });
+        }).map(walletConfirmation -> sender.send(outboundMessage(walletConfirmation, QUEUE_A, QUEUES_EXCHANGE))
+                .subscribe()
         ).subscribe();
     }
 

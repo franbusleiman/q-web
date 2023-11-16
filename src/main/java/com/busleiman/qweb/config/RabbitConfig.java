@@ -77,6 +77,8 @@ public class RabbitConfig {
         Queue queueE = new Queue(QUEUE_E);
         Queue queueF = new Queue(QUEUE_F);
         Queue queueG = new Queue(QUEUE_G);
+        Queue queueH = new Queue(QUEUE_H);
+
 
 
         amqpAdmin.declareQueue(queueB);
@@ -86,6 +88,7 @@ public class RabbitConfig {
         amqpAdmin.declareQueue(queueE);
         amqpAdmin.declareQueue(queueF);
         amqpAdmin.declareQueue(queueG);
+        amqpAdmin.declareQueue(queueH);
 
 
         // Declare bindings
@@ -96,6 +99,7 @@ public class RabbitConfig {
         Binding bindingE = BindingBuilder.bind(queueE).to(queuesExchange).with(QUEUE_E).noargs();
         Binding bindingF = BindingBuilder.bind(queueF).to(queuesExchange).with(QUEUE_F).noargs();
         Binding bindingG = BindingBuilder.bind(queueG).to(queuesExchange).with(QUEUE_G).noargs();
+        Binding bindingH = BindingBuilder.bind(queueH).to(queuesExchange).with(QUEUE_H).noargs();
 
 
         amqpAdmin.declareBinding(bindingB);
@@ -105,5 +109,6 @@ public class RabbitConfig {
         amqpAdmin.declareBinding(bindingE);
         amqpAdmin.declareBinding(bindingF);
         amqpAdmin.declareBinding(bindingG);
+        amqpAdmin.declareBinding(bindingH);
     }
 }

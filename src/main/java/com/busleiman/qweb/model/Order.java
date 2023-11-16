@@ -17,12 +17,12 @@ public class Order implements Persistable {
     private  Long javaCoinsAmount;
     private Long javaCoinPrice;
     private Long usdAmount;
-    private Boolean bankAccepted;
-    private Boolean walletAccepted;
+    private OrderState bankAccepted;
+    private OrderState walletAccepted;
     private OrderState orderState;
 
     @Override
     public boolean isNew() {
-        return sellerDni == null;
+        return bankAccepted == OrderState.IN_PROGRESS && walletAccepted ==OrderState.IN_PROGRESS;
     }
 }
