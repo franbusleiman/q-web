@@ -8,12 +8,13 @@ import lombok.experimental.SuperBuilder;
 @Data
 @NoArgsConstructor
 @SuperBuilder
-public class WalletConfirmation {
+public class OrderConfirmation {
     private Long id;
     private OrderState orderState;
 
     //a setear una vez consumido
     private String sellerDni;
     private String errorDescription;
+    private SourceType sourceType;
 }
 

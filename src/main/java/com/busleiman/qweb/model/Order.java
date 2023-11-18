@@ -1,5 +1,6 @@
 package com.busleiman.qweb.model;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Builder;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -14,15 +15,20 @@ public class Order implements Persistable {
     private Long id;
     private String buyerDni;
     private String sellerDni;
-    private  Long javaCoinsAmount;
-    private Long javaCoinPrice;
-    private Long usdAmount;
+    private Double javaCoinPrice;
+    private Double usdAmount;
+    private Double javaCoinsAmount;
     private OrderState bankAccepted;
     private OrderState walletAccepted;
     private OrderState orderState;
+    private String errorDescription;
 
     @Override
     public boolean isNew() {
         return bankAccepted == OrderState.IN_PROGRESS && walletAccepted ==OrderState.IN_PROGRESS;
+    }
+
+    public void calculateJavaCoinsAmount(){
+        this.javaCoinsAmount =  this.usdAmount * this.javaCoinPrice;
     }
 }
