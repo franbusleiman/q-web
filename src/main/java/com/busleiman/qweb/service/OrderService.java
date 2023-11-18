@@ -92,14 +92,16 @@ public class OrderService {
 
 
     /**
-     * Se recibe el mensaje order confirmation por parte del servicio Wallet,
-     * se registra si la misma aceptó o no la operación.
+     * Se recibe el mensaje order confirmation tanto por parte del servicio Wallet como del servicio Bank,
+     * se registra si el mismo aceptó o no la operación.
      * <p>
-     * En el caso de no haberse aceptado la orden, se envía un mensaje de orden no aceptada,
-     * para mantener consistentes los otros microservicios,
-     * en el caso de aceptarse la orden, pero que el banco no la haya acepado aún, se guarda
-     * y no se envía mensaje, esperando confirmación del mismo,
-     * en el caso de que ambos microservicios acepten la orden se envía un mensaje con los datos de un
+     * En el caso de no haberse aceptado la orden, y que el estado previo general de la orden no sea denegado,
+     * se envía el mensaje de error a los servicios para mantener consistencia.
+     * <p>
+     * En el caso de aceptarse la orden, pero que el otro servicio no la haya acepado aún, se guarda
+     * y no se envía mensaje, esperando confirmación del mismo.
+     * <p>
+     * En el caso de que ambos microservicios acepten la orden se envía un mensaje con los datos de un
      * vendedor que toma la orden.
      */
     @Transactional
