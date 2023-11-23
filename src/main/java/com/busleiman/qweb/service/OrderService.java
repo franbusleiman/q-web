@@ -90,8 +90,8 @@ public class OrderService {
 
     /**
      * Se envía la orden a registrar mediante una exchange fanout,
-     * sera consumida por el banco, que validara y descontara el saldo del usuario,
-     * y por la wallet, que valida la existencia del usuario, y si no lo crea.
+     * sera consumida por el servicio Bank, que validara y descontara el saldo del usuario,
+     * y por la Wallet, que valida la existencia del usuario, y si no lo crea.
      */
     public Mono<Void> send(Order order) {
         order.calculateJavaCoinsAmount();
@@ -167,7 +167,7 @@ public class OrderService {
 
     /**
      * Se recibe el mensaje order confirmation final luego de que la transacción se haya llevado a cabo,
-     * o no (debido a un error), tanto en la wallet y en al bank. Se registra e imprime la orden.
+     * o no (debido a un error), tanto en la wallet y en el bank. Se registra e imprime la orden.
      */
     public Flux<Void> consume2() {
 
