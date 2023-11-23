@@ -55,7 +55,29 @@ public class OrderService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
-        send().subscribe();
+
+        //Se envía una orden que va a fallar debido a fondos insuficientes.
+        Order order1 = Order.builder()
+                .buyerDni("42384769")
+                .usdAmount(1000000.0)
+                .javaCoinPrice(500.0)
+                .bankAccepted(OrderState.IN_PROGRESS)
+                .walletAccepted(OrderState.IN_PROGRESS)
+                .orderState(OrderState.IN_PROGRESS)
+                .build();
+        send(order1).subscribe();
+
+        //Se envía una orden que va a ser aceptada.
+        Order order2 = Order.builder()
+                .buyerDni("42384769")
+                .usdAmount(100.0)
+                .javaCoinPrice(500.0)
+                .bankAccepted(OrderState.IN_PROGRESS)
+                .walletAccepted(OrderState.IN_PROGRESS)
+                .orderState(OrderState.IN_PROGRESS)
+                .build();
+        send(order2).subscribe();
+
         consume().subscribe();
         consume2().subscribe();
     }
@@ -71,18 +93,7 @@ public class OrderService {
      * sera consumida por el banco, que validara y descontara el saldo del usuario,
      * y por la wallet, que valida la existencia del usuario, y si no lo crea.
      */
-    public Mono<Void> send() {
-
-        Order order = Order.builder()
-                .id(1L)
-                .buyerDni("42384769")
-                .usdAmount(100.0)
-                .bankAccepted(OrderState.IN_PROGRESS)
-                .walletAccepted(OrderState.IN_PROGRESS)
-                .orderState(OrderState.IN_PROGRESS)
-                .javaCoinPrice(500.0)
-                .build();
-
+    public Mono<Void> send(Order order) {
         order.calculateJavaCoinsAmount();
 
         return orderRepository.save(order)
@@ -95,14 +106,14 @@ public class OrderService {
      * Se recibe el mensaje order confirmation tanto por parte del servicio Wallet como del servicio Bank,
      * se registra si el mismo aceptó o no la operación.
      * <p>
-     * En el caso de no haberse aceptado la orden, y que el estado previo general de la orden no sea denegado,
-     * se envía el mensaje de error a los servicios para mantener consistencia.
-     * <p>
-     * En el caso de aceptarse la orden, pero que el otro servicio no la haya acepado aún, se guarda
-     * y no se envía mensaje, esperando confirmación del mismo.
+     * En el caso de no haberse recibido respuesta del otro servicio,
+     * se guarda y se espera la confirmación del mismo.
      * <p>
      * En el caso de que ambos microservicios acepten la orden se envía un mensaje con los datos de un
      * vendedor que toma la orden.
+     * <p>
+     * En el caso de que ambos servicios respondieron, y uno no acepto la orden,
+     * se envía el mensaje de error a los servicios para mantener consistencia.
      */
     @Transactional
     public Flux<Void> consume() {
@@ -127,23 +138,29 @@ public class OrderService {
                             order.setWalletAccepted(orderState);
                         }
 
-                        return orderRepository.save(order)
-                                .flatMap(orderSaved -> {
-                                    if (orderState.equals(OrderState.NOT_ACCEPTED) && !orderSaved.getOrderState().equals(OrderState.NOT_ACCEPTED)) {
-                                        // Se setea en "no aceptado" el estado de la orden y se envía el error.
-                                        orderSaved.setOrderState(OrderState.NOT_ACCEPTED);
-                                        orderConfirmation.setSellerDni("");
-                                        return orderRepository.save(orderSaved).thenReturn(orderConfirmation);
-                                    } else if (orderSaved.getWalletAccepted() == OrderState.IN_PROGRESS || orderSaved.getBankAccepted() == OrderState.IN_PROGRESS) {
-                                        // Se espera a la confirmación de la otra parte
-                                        return Mono.empty();
-                                    } else {
-                                        // Un vendedor toma la orden y se envía la confirmación.
-                                        orderConfirmation.setSellerDni("46171291");
-                                        orderConfirmation.setOrderState(OrderState.ACCEPTED);
-                                        return Mono.just(orderConfirmation);
-                                    }
-                                });
+                        if (order.getWalletAccepted().equals(OrderState.IN_PROGRESS) || order.getBankAccepted().equals(OrderState.IN_PROGRESS)) {
+                            //Una de las dos partes está en in progress
+                            if (orderState.equals(OrderState.NOT_ACCEPTED)) {
+                                order.setErrorDescription(orderConfirmation.getErrorDescription());
+                                order.setOrderState(OrderState.NOT_ACCEPTED);
+                            }
+                             return orderRepository.save(order).then(Mono.empty());
+                        } else if (order.getWalletAccepted().equals(OrderState.ACCEPTED) && order.getBankAccepted().equals(OrderState.ACCEPTED)) {
+                            //Orden aceptada y tomada por un vendedor
+                            orderConfirmation.setSellerDni("46171291");
+                            order.setSellerDni("46171291");
+
+                            orderConfirmation.setOrderState(OrderState.ACCEPTED);
+
+                            return orderRepository.save(order).thenReturn(orderConfirmation);
+                        } else {
+                            //Una de las dos partes no acepto la orden
+                            orderConfirmation.setErrorDescription(order.getErrorDescription() != null ? order.getErrorDescription() : orderConfirmation.getErrorDescription());
+                            orderConfirmation.setOrderState(OrderState.NOT_ACCEPTED);
+                            orderConfirmation.setSellerDni("");
+
+                            return orderRepository.save(order).thenReturn(orderConfirmation);
+                        }
                     });
         }).flatMap(confirmation -> sender.send(outboundMessage(confirmation, QUEUE_A, QUEUES_EXCHANGE)));
     }

@@ -10,7 +10,7 @@ import org.springframework.data.relational.core.mapping.Table;
 @Data
 @Builder
 @Table("ORDERS")
-public class Order implements Persistable {
+public class Order {
     @Id
     private Long id;
     private String buyerDni;
@@ -22,11 +22,6 @@ public class Order implements Persistable {
     private OrderState walletAccepted;
     private OrderState orderState;
     private String errorDescription;
-
-    @Override
-    public boolean isNew() {
-        return bankAccepted == OrderState.IN_PROGRESS && walletAccepted ==OrderState.IN_PROGRESS;
-    }
 
     public void calculateJavaCoinsAmount(){
         this.javaCoinsAmount =  this.usdAmount * this.javaCoinPrice;
